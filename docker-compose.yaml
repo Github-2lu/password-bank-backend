@@ -1,0 +1,90 @@
+networks:
+  postgres:
+    external: true
+  microservice-network:
+    external: true
+volumes:
+  pgadmin:
+  postgres:
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres
+    environment:
+      - POSTGRES_USER=tulu
+      - POSTGRES_PASSWORD=0902
+      - PGDATA=/data/postgres
+      - POSTGRES_MULTIPLE_DATABASES=userDB,passwordDB
+    volumes:
+      - ./docker-postgresql-multiple-databases:/docker-entrypoint-initdb.d
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    networks:
+      - postgres
+    restart: unless-stopped
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=pgadmin4@pgadmin.org
+      - PGADMIN_DEFAULT_PASSWORD=admin
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    ports:
+      - 5050:80
+    networks:
+      - postgres
+    restart: unless-stopped
+  servicereg:
+    image: tulu92002/servicereg:latest
+    container_name: servicereg
+    ports:
+      - 8083:8083
+    depends_on:
+      - postgres
+      - pgadmin
+    networks:
+      - microservice-network
+      - postgres
+  user:
+    image: tulu92002/user:latest
+    container_name: user
+    ports:
+      - 8082:8082
+    depends_on:
+      - servicereg
+    networks:
+      - microservice-network
+      - postgres
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+  password:
+    image: tulu92002/password:latest
+    container_name: password
+    ports:
+      - 8081:8081
+    depends_on:
+      - servicereg
+      - user
+    networks:
+      - microservice-network
+      - postgres
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+  gateway:
+    image: tulu92002/gateway:latest
+    container_name: gateway
+    ports:
+      - 8084:8084
+    depends_on:
+      - servicereg
+      - user
+      - password
+    networks:
+      - microservice-network
+      - postgres
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
